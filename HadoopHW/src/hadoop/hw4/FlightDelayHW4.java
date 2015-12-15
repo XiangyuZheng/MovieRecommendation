@@ -3,13 +3,9 @@ package hadoop.hw4;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.DoubleWritable;
-import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
@@ -20,7 +16,7 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-import au.com.bytecode.opencsv.CSVReader;
+import com.opencsv.CSVReader;
 
 public class FlightDelayHW4 {
 
@@ -87,7 +83,7 @@ public class FlightDelayHW4 {
      * A partitioner for carrier names.
      */
     public static class FlightPartitioner extends Partitioner<Text, Text> {
-        
+
         @Override
         public int getPartition(Text key, Text val, int numPartitions) {
             return key.toString().split(",")[0].hashCode() % numPartitions;
@@ -117,7 +113,7 @@ public class FlightDelayHW4 {
     }
 
     /**
-     * A grouping comparator for grouping by carriers. 
+     * A grouping comparator for grouping by carriers.
      */
     public static class CarrierGroupingComparator extends WritableComparator {
         public CarrierGroupingComparator() {
@@ -132,8 +128,7 @@ public class FlightDelayHW4 {
         }
     }
 
-    public static class FlightReducer extends
-            Reducer<Text, Text, Text, Text> {
+    public static class FlightReducer extends Reducer<Text, Text, Text, Text> {
 
         private Text resultKey = new Text();
         private Text result = new Text();

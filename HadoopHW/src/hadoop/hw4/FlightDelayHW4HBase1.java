@@ -16,11 +16,10 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-import au.com.bytecode.opencsv.CSVReader;
+import com.opencsv.CSVReader;
 
 public class FlightDelayHW4HBase1 {
     private static final String HTABLE_NAME = "Flight";
@@ -67,8 +66,8 @@ public class FlightDelayHW4HBase1 {
         private HTable table;
 
         @Override
-        protected void setup(Mapper<Object, Text, Text, Text>.Context context) throws IOException,
-                InterruptedException {
+        protected void setup(Mapper<Object, Text, Text, Text>.Context context)
+                throws IOException, InterruptedException {
             super.setup(context);
             config = HBaseConfiguration.create();
             table = new HTable(config, HTABLE_NAME);
@@ -95,9 +94,9 @@ public class FlightDelayHW4HBase1 {
                     continue;
                 }
                 // inserts into HBase
-                Put p = new Put(Bytes.toBytes(year
-                        + (Integer.parseInt(month) < 10 ? "0" + month : month) + carrier + date
-                        + flightNum));
+                Put p = new Put(
+                        Bytes.toBytes(year + (Integer.parseInt(month) < 10 ? "0" + month : month)
+                                + carrier + date + flightNum));
                 p.add(Bytes.toBytes(HTABLE_FAMILY), Bytes.toBytes("Year"),
                         Bytes.toBytes(nextLine[0]));
                 p.add(Bytes.toBytes(HTABLE_FAMILY), Bytes.toBytes("Quarter"),

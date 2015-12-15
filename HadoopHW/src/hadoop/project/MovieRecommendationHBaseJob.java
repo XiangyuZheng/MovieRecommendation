@@ -21,7 +21,7 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-import au.com.bytecode.opencsv.CSVReader;
+import com.opencsv.CSVReader;
 
 public class MovieRecommendationHBaseJob {
     private static final String HTABLE_MOVIE = "Movie";
@@ -38,9 +38,9 @@ public class MovieRecommendationHBaseJob {
         job.setOutputValueClass(Text.class);
         FileInputFormat.addInputPath(job, new Path(args[0]));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
-//         FileInputFormat.addInputPath(job, new Path(
-//         "/Users/Sam/Downloads/ml-latest-small/movies.csv"));
-//         FileOutputFormat.setOutputPath(job, new Path("output"));
+        // FileInputFormat.addInputPath(job, new Path(
+        // "/Users/Sam/Downloads/ml-latest-small/movies.csv"));
+        // FileOutputFormat.setOutputPath(job, new Path("output"));
         System.exit(job.waitForCompletion(true) ? 0 : 1);
     }
 
@@ -63,8 +63,8 @@ public class MovieRecommendationHBaseJob {
         private Scan ratingScanner;
 
         @Override
-        protected void setup(Mapper<Object, Text, Text, Text>.Context context) throws IOException,
-                InterruptedException {
+        protected void setup(Mapper<Object, Text, Text, Text>.Context context)
+                throws IOException, InterruptedException {
             super.setup(context);
             config = HBaseConfiguration.create();
             movieTable = new HTable(config, HTABLE_MOVIE);
@@ -107,12 +107,10 @@ public class MovieRecommendationHBaseJob {
                                 Get g = new Get(Bytes.toBytes(movieID2 + "-" + userID));
                                 Result r = ratingTable.get(g);
                                 String rating2 = Bytes.toString(r.getValue(
-                                        Bytes.toBytes(HTABLE_FAMILY), Bytes
-                                                .toBytes("Rating")));
+                                        Bytes.toBytes(HTABLE_FAMILY), Bytes.toBytes("Rating")));
                                 if (rating2 != null) {
                                     String rating1 = Bytes.toString(rr.getValue(
-                                            Bytes.toBytes(HTABLE_FAMILY), Bytes
-                                                    .toBytes("Rating")));
+                                            Bytes.toBytes(HTABLE_FAMILY), Bytes.toBytes("Rating")));
                                     outputKey.set(movieID1 + "-" + movieID2);
                                     outputVal.set(rating1 + "," + rating2);
                                     context.write(outputKey, outputVal);
@@ -129,8 +127,7 @@ public class MovieRecommendationHBaseJob {
         }
     }
 
-    public static class MovieSimilarityReducer extends
-            Reducer<Text, Text, Text, Text> {
+    public static class MovieSimilarityReducer extends Reducer<Text, Text, Text, Text> {
 
         private Text resultKey = new Text();
         private Text result = new Text();

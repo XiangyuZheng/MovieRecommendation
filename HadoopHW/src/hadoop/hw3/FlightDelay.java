@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DoubleWritable;
@@ -15,7 +16,7 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-import au.com.bytecode.opencsv.CSVReader;
+import com.opencsv.CSVReader;
 
 public class FlightDelay {
 
@@ -30,12 +31,12 @@ public class FlightDelay {
         job.setOutputValueClass(Text.class);
         FileInputFormat.addInputPath(job, new Path(args[0]));
         FileOutputFormat.setOutputPath(job, new Path(args[1] + "_intermediate"));
-//        FileInputFormat
-//                .addInputPath(
-//                        job,
-//                        new Path(
-//                                "/Users/Sam/Downloads/data.csv"));
-//        FileOutputFormat.setOutputPath(job, new Path("intermediateOutput"));
+        // FileInputFormat
+        // .addInputPath(
+        // job,
+        // new Path(
+        // "/Users/Sam/Downloads/data.csv"));
+        // FileOutputFormat.setOutputPath(job, new Path("intermediateOutput"));
         job.waitForCompletion(true);
 
         // job2
@@ -46,8 +47,8 @@ public class FlightDelay {
         job2.setReducerClass(AvgReducer.class);
         job2.setOutputKeyClass(Text.class);
         job2.setOutputValueClass(Text.class);
-//        FileInputFormat.addInputPath(job2, new Path("intermediateOutput"));
-//        FileOutputFormat.setOutputPath(job2, new Path("output"));
+        // FileInputFormat.addInputPath(job2, new Path("intermediateOutput"));
+        // FileOutputFormat.setOutputPath(job2, new Path("output"));
         FileInputFormat.addInputPath(job2, new Path(args[1] + "_intermediate"));
         FileOutputFormat.setOutputPath(job2, new Path(args[1]));
         System.exit(job2.waitForCompletion(true) ? 0 : 1);
@@ -89,11 +90,12 @@ public class FlightDelay {
                 }
                 month = nextLine[2];
                 // filters by year and month
-//                if ((Integer.parseInt(year) != 2007 || Integer.parseInt(month) != 12)
-//                        && (Integer.parseInt(year) != 2008 || Integer
-//                                .parseInt(month) != 1)) {
-//                    continue;
-//                }
+                // if ((Integer.parseInt(year) != 2007 ||
+                // Integer.parseInt(month) != 12)
+                // && (Integer.parseInt(year) != 2008 || Integer
+                // .parseInt(month) != 1)) {
+                // continue;
+                // }
                 if (!(Integer.parseInt(year) == 2007 && Integer.parseInt(month) >= 6)
                         && !(Integer.parseInt(year) == 2008 && Integer.parseInt(month) <= 5)) {
                     continue;
@@ -114,8 +116,7 @@ public class FlightDelay {
                 isCancelled = nextLine[41];
                 isDiverted = nextLine[43];
                 // filters by isCancelled and isDiverted
-                if (Double.parseDouble(isCancelled) == 1
-                        || Double.parseDouble(isDiverted) == 1) {
+                if (Double.parseDouble(isCancelled) == 1 || Double.parseDouble(isDiverted) == 1) {
                     continue;
                 }
                 // constructs key and value
@@ -127,8 +128,7 @@ public class FlightDelay {
                     outputKeyStr += origin;
                     outputValStr = "to";
                 }
-                outputValStr = outputValStr + "," + depTime + "," + arrTime
-                        + "," + arrDelayMinutes;
+                outputValStr = outputValStr + "," + depTime + "," + arrTime + "," + arrDelayMinutes;
                 outputKey.set(outputKeyStr);
                 outputVal.set(outputValStr);
                 context.write(outputKey, outputVal);
@@ -136,8 +136,7 @@ public class FlightDelay {
         }
     }
 
-    public static class JoinReducer extends
-            Reducer<Text, Text, Text, IntWritable> {
+    public static class JoinReducer extends Reducer<Text, Text, Text, IntWritable> {
 
         private IntWritable result = new IntWritable();
         private List<Text> fromList = new ArrayList<Text>();
@@ -159,9 +158,8 @@ public class FlightDelay {
                 for (Text to : toList) {
                     if (Integer.parseInt(from.toString().split(",")[2]) < Integer
                             .parseInt(to.toString().split(",")[1])) {
-                        result.set((int) (Double.parseDouble(from.toString()
-                                .split(",")[3]) + Double.parseDouble(to
-                                .toString().split(",")[3])));
+                        result.set((int) (Double.parseDouble(from.toString().split(",")[3])
+                                + Double.parseDouble(to.toString().split(",")[3])));
                         context.write(key, result);
                     }
                 }
@@ -172,8 +170,7 @@ public class FlightDelay {
     /**
      * Mapper class for calculating AVG in job2
      */
-    public static class AvgMapper extends
-            Mapper<Object, Text, Text, Text> {
+    public static class AvgMapper extends Mapper<Object, Text, Text, Text> {
 
         private Text keyText = new Text();
         private Text valText = new Text();
@@ -194,19 +191,18 @@ public class FlightDelay {
             context.write(keyText, valText);
             super.cleanup(context);
         }
-        
+
     }
 
     /**
      * Reducer class for calculating AVG in job2
      */
-    public static class AvgReducer extends
-            Reducer<Text, Text, IntWritable, DoubleWritable> {
+    public static class AvgReducer extends Reducer<Text, Text, IntWritable, DoubleWritable> {
 
         private DoubleWritable result = new DoubleWritable();
 
-        public void reduce(Text key, Iterable<Text> values,
-                Context context) throws IOException, InterruptedException {
+        public void reduce(Text key, Iterable<Text> values, Context context)
+                throws IOException, InterruptedException {
             double sum = 0;
             int num = 0;
             for (Text val : values) {
