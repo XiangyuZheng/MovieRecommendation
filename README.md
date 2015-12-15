@@ -10,3 +10,10 @@ https://s3-us-west-2.amazonaws.com/hadoop-result-bucket/ouputSimilarity/part-r-0
 ...
 
 https://s3-us-west-2.amazonaws.com/hadoop-result-bucket/ouputSimilarity/part-r-00125
+
+
+Input data:
+
+https://s3.amazonaws.com/hadoop-input/ratings.csv
+
+https://s3.amazonaws.com/hadoop-input/ratings-small.csv
