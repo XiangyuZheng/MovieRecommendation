@@ -4,7 +4,9 @@ import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.StringTokenizer;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -15,11 +17,17 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.MasterNotRunningException;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.ZooKeeperConnectionException;
+import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
+import org.apache.hadoop.hbase.mapreduce.TableMapper;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -55,12 +63,168 @@ public class InsertJob {
 
     public static void main(String[] args) throws Exception {
         // insertSimilarity(args[0], args[1] + "_Silimarity");
-        // insertRating(args[2], args[3] + "_Rating");
+        // transformRating(args[2], args[3] + "_Rating");
+        multiply("multiply_");
 
     }
 
-    static class Multiply {
+    static void multiply(String output) throws Exception {
+        Job job = new Job(hbaseCon, "MatrixMultiply");
+        job.setJarByClass(Multiply.class); // class that contains mapper
 
+        Scan scan = new Scan();
+        scan.setCaching(5000);
+        scan.setCacheBlocks(false);
+
+        TableMapReduceUtil.initTableMapperJob(toBytes(HTABLE_RATING), scan,
+                Multiply.MultiplyMapper.class, IntWritable.class, Text.class, job);
+
+        job.setReducerClass(Multiply.MultiplyReducer.class);
+
+        // job.setOutputFormatClass(FileOutputFormat.class);
+        FileOutputFormat.setOutputPath(job, new Path(output + System.currentTimeMillis() / 1000));
+
+        boolean b = job.waitForCompletion(true);
+        if (!b) {
+            throw new Exception("error with job!");
+        }
+    }
+
+    static class Multiply {
+        static class MultiplyMapper extends TableMapper<IntWritable, Text> {
+            final int size = 100 * 1024;
+            /* index is movie id, in below arrays. */
+            int[] bufferRatings = new int[size];
+            int[] bufferSimilarities = new int[size];
+            int[] bufferResult = new int[size];
+
+            HTable similarityTable;
+
+            @Override
+            protected void setup(
+                    Mapper<ImmutableBytesWritable, Result, IntWritable, Text>.Context context)
+                            throws IOException, InterruptedException {
+                similarityTable = new HTable(hbaseCon, HTABLE_SIMILARITY);
+            }
+
+            public void map(ImmutableBytesWritable row, Result result, Context context)
+                    throws InterruptedException, IOException {
+                /*
+                 * get user's rating array
+                 */
+
+                int userID = Bytes.toInt(row.get());
+                int[] ratings = parseKeyValue(result, bufferRatings);
+
+                /*
+                 * make a list of get.
+                 */
+                List<Get> gets = new ArrayList<>();
+                for (int i = 0; i < size; i++) {
+                    if (ratings[i] != 0) {
+                        Get get = new Get(toBytes(i)).addColumn(CF_NAME_BYTE, CQ_NAME_BYTE);
+                        gets.add(get);
+                    }
+                }
+
+                /*
+                 * calculate recommendation index for one user.
+                 */
+                Arrays.fill(bufferResult, 0);
+
+                Result[] similaraties = similarityTable.get(gets);
+                for (Result oneRow : similaraties) {
+                    System.err.println(oneRow);
+                }
+
+                for (Result oneRow : similaraties) {
+
+                    int[] similarity = parseKeyValue(oneRow, bufferSimilarities);
+                    // get the rating for this similarity row.
+                    int rating = ratings[Bytes.toInt(oneRow.getRow())];
+
+                    // accumulate result
+                    for (int i = 0; i < size; i++) {
+                        bufferResult[i] += rating * similarity[i];
+                    }
+                }
+
+                /*
+                 * sort and output
+                 */
+
+                List<Pair> reco = getTop100(bufferResult);
+
+                StringBuilder sb = new StringBuilder();
+                for (Pair p : reco)
+                    sb.append('\t').append('(').append(p.idx).append(p.value).append(')');
+
+                context.write(new IntWritable(userID), new Text(sb.toString()));
+
+            }
+
+            static class Pair implements Comparable<Pair> {
+                int idx;
+                int value;
+
+                public Pair(int i, int v) {
+                    idx = i;
+                    value = v;
+                }
+
+                @Override
+                /**
+                 * decreading order
+                 */
+                public int compareTo(Pair that) {
+                    return that.value - this.value;
+                }
+            }
+
+            List<Pair> getTop100(int[] result) {
+                Pair[] array = new Pair[result.length];
+                for (int i = 0; i < result.length; i++)
+                    array[i] = new Pair(i, result[i]);
+
+                // decreasing order.
+                Arrays.sort(array);
+
+                List<Pair> ret = new ArrayList<>(100);
+                for (int i = 0; i < 100; i++) {
+                    ret.add(array[i]);
+                }
+
+                return ret;
+            }
+
+            private int[] parseKeyValue(Result result, int[] buffer) {
+                Arrays.fill(buffer, 0);
+
+                Cell cell = result.getColumnLatestCell(CF_NAME_BYTE, CQ_NAME_BYTE);
+                String s = new String(cell.getValueArray(), cell.getValueOffset(),
+                        cell.getValueLength());
+
+                // build map. movieid -> rating ; map avg size == 50
+                StringTokenizer st = new StringTokenizer(s, "()\t");
+
+                while (st.hasMoreTokens()) {
+                    int movieID = Integer.parseInt(st.nextToken());
+                    int rating = Integer.parseInt(st.nextToken());
+                    buffer[movieID] = rating;
+                }
+
+                return buffer;
+            }
+        }
+
+        static class MultiplyReducer extends Reducer<IntWritable, Text, IntWritable, Text> {
+            @Override
+            protected void reduce(IntWritable arg0, Iterable<Text> arg1,
+                    Reducer<IntWritable, Text, IntWritable, Text>.Context arg2)
+                            throws IOException, InterruptedException {
+                super.reduce(arg0, arg1, arg2);
+            }
+        }
     }
 
     public static void insertSimilarity(String input, String output) throws Exception {
@@ -85,7 +249,7 @@ public class InsertJob {
         // readTest(HTABLE_SIMILARITY);
     }
 
-    public static void insertRating(String input, String output) throws Exception {
+    public static void transformRating(String input, String output) throws Exception {
         Configuration conf = new Configuration();
         Job job = new Job(conf);
         job.setJarByClass(RatingInsert.class);
