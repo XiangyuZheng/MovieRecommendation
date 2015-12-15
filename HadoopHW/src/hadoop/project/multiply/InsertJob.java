@@ -62,9 +62,14 @@ public class InsertJob {
     }
 
     public static void main(String[] args) throws Exception {
-        // insertSimilarity(args[0], args[1] + "_Silimarity");
-        // transformRating(args[2], args[3] + "_Rating");
-        multiply("multiply_");
+        if (args.length != 3) {
+            System.err.println("wrong size of args : " + args.length);
+            System.exit(-1);
+        }
+
+        insertSimilarity(args[0], args[2] + "/Silimarity");
+        transformRating(args[1], args[2] + "/Rating");
+        multiply(args[2] + "/multiply");
 
     }
 
@@ -92,7 +97,7 @@ public class InsertJob {
 
     static class Multiply {
         static class MultiplyMapper extends TableMapper<IntWritable, Text> {
-            final int size = 100 * 1024;
+            final int size = 200 * 1024;
             /* index is movie id, in below arrays. */
             int[] bufferRatings = new int[size];
             int[] bufferSimilarities = new int[size];
@@ -138,7 +143,9 @@ public class InsertJob {
                 }
 
                 for (Result oneRow : similaraties) {
-
+                    // now related similarity found for this user
+                    if (oneRow.getRow() == null)
+                        continue;
                     int[] similarity = parseKeyValue(oneRow, bufferSimilarities);
                     // get the rating for this similarity row.
                     int rating = ratings[Bytes.toInt(oneRow.getRow())];
@@ -156,8 +163,11 @@ public class InsertJob {
                 List<Pair> reco = getTop100(bufferResult);
 
                 StringBuilder sb = new StringBuilder();
-                for (Pair p : reco)
-                    sb.append('\t').append('(').append(p.idx).append(p.value).append(')');
+                for (Pair p : reco) {
+                    sb.append('\t').append('(').append(p.idx).append('\t').append(p.value)
+                            .append(')');
+                }
+                System.err.println(reco);
 
                 context.write(new IntWritable(userID), new Text(sb.toString()));
 
@@ -178,6 +188,12 @@ public class InsertJob {
                  */
                 public int compareTo(Pair that) {
                     return that.value - this.value;
+                }
+
+                @Override
+                public String toString() {
+
+                    return "" + value;
                 }
             }
 
@@ -201,6 +217,9 @@ public class InsertJob {
                 Arrays.fill(buffer, 0);
 
                 Cell cell = result.getColumnLatestCell(CF_NAME_BYTE, CQ_NAME_BYTE);
+                if (cell == null)
+                    return buffer;
+
                 String s = new String(cell.getValueArray(), cell.getValueOffset(),
                         cell.getValueLength());
 
