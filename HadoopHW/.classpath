@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.6"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8"/>
 	<classpathentry kind="lib" path="/home/zheyu/2nd_home/hadoop/hadoop-2.6.1/share/hadoop/mapreduce/lib/aopalliance-1.0.jar"/>
 	<classpathentry kind="lib" path="/home/zheyu/2nd_home/hadoop/hadoop-2.6.1/share/hadoop/mapreduce/lib/asm-3.2.jar"/>
 	<classpathentry kind="lib" path="/home/zheyu/2nd_home/hadoop/hadoop-2.6.1/share/hadoop/mapreduce/lib/avro-1.7.4.jar"/>
@@ -189,5 +189,6 @@
 	<classpathentry kind="lib" path="/media/zheyu/2nd_home/hadoop/hbase-0.96.0-hadoop2/lib/jruby-complete-1.6.8.jar"/>
 	<classpathentry kind="lib" path="/media/zheyu/2nd_home/hadoop/opencsv-3.5.jar"/>
 	<classpathentry kind="lib" path="/media/zheyu/2nd_home/hadoop/au.opencsv-3.6.jar"/>
+	<classpathentry kind="lib" path="/media/zheyu/2nd_home/hadoop/hadoop-2.6.1/share/hadoop/common/lib/commons-codec-1.4.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
