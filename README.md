@@ -17,3 +17,10 @@ Input data:
 https://s3.amazonaws.com/hadoop-input/ratings.csv
 
 https://s3.amazonaws.com/hadoop-input/ratings-small.csv
+
+
+Versions:
+
+Hadoop distribution:Amazon 1.0.3
+
+Applications:HBase 0.92.0
