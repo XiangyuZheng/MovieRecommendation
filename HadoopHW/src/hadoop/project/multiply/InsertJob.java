@@ -10,12 +10,11 @@ import java.util.StringTokenizer;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
-import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.ZooKeeperConnectionException;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
@@ -55,15 +54,26 @@ public class InsertJob {
         CQ_NAME_BYTE = toBytes(CQ_NAME);
     }
 
-    private static Configuration hbaseCon = HBaseConfiguration.create();
+    // static {
+    // /* Error checking with HBase connection! */
+    // hbaseCon.addResource("/home/hadoop/hbase/conf/hbase-site.xml");
+    // try {
+    // System.out.println("zzzz connection test.");
+    // HBaseAdmin.checkHBaseAvailable(hbaseCon);
+    // } catch (Exception e) {
+    // System.out.println("zzzz !! connection test fail!!");
+    // e.printStackTrace();
+    // }
+    //
+    // }
 
-    {
-        hbaseCon.set("hbase.zookeeper.quorum", "localhost");
-    }
+    // {
+    // hbaseCon.set("hbase.zookeeper.quorum", "localhost");
+    // }
 
     public static void main(String[] args) throws Exception {
         if (args.length != 3) {
-            System.err.println("wrong size of args : " + args.length);
+            System.out.println("wrong size of args : " + args.length);
             System.exit(-1);
         }
 
@@ -74,7 +84,11 @@ public class InsertJob {
     }
 
     static void multiply(String output) throws Exception {
+        System.out.println("multiply +");
+        Configuration hbaseCon = HBaseConfiguration.create();
+        HBaseAdmin.checkHBaseAvailable(hbaseCon);
         Job job = new Job(hbaseCon, "MatrixMultiply");
+
         job.setJarByClass(Multiply.class); // class that contains mapper
 
         Scan scan = new Scan();
@@ -89,14 +103,16 @@ public class InsertJob {
         // job.setOutputFormatClass(FileOutputFormat.class);
         FileOutputFormat.setOutputPath(job, new Path(output + System.currentTimeMillis() / 1000));
 
-        boolean b = job.waitForCompletion(true);
-        if (!b) {
-            throw new Exception("error with job!");
-        }
+        if (!job.waitForCompletion(true))
+            throw new RuntimeException("job failed!");
+
+        System.out.println("multiply -");
     }
 
     static class Multiply {
+
         static class MultiplyMapper extends TableMapper<IntWritable, Text> {
+
             final int size = 200 * 1024;
             /* index is movie id, in below arrays. */
             int[] bufferRatings = new int[size];
@@ -109,6 +125,15 @@ public class InsertJob {
             protected void setup(
                     Mapper<ImmutableBytesWritable, Result, IntWritable, Text>.Context context)
                             throws IOException, InterruptedException {
+
+                Configuration hbaseCon = HBaseConfiguration.create();
+                try {
+                    HBaseAdmin.checkHBaseAvailable(hbaseCon);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    throw new IOException("still the same error", e);
+                }
+
                 similarityTable = new HTable(hbaseCon, HTABLE_SIMILARITY);
             }
 
@@ -139,7 +164,7 @@ public class InsertJob {
 
                 Result[] similaraties = similarityTable.get(gets);
                 for (Result oneRow : similaraties) {
-                    System.err.println(oneRow);
+                    System.out.println(oneRow);
                 }
 
                 for (Result oneRow : similaraties) {
@@ -167,7 +192,7 @@ public class InsertJob {
                     sb.append('\t').append('(').append(p.idx).append('\t').append(p.value)
                             .append(')');
                 }
-                System.err.println(reco);
+                System.out.println(reco);
 
                 context.write(new IntWritable(userID), new Text(sb.toString()));
 
@@ -215,13 +240,10 @@ public class InsertJob {
 
             private int[] parseKeyValue(Result result, int[] buffer) {
                 Arrays.fill(buffer, 0);
-
-                Cell cell = result.getColumnLatestCell(CF_NAME_BYTE, CQ_NAME_BYTE);
+                KeyValue cell = result.getColumnLatest(CF_NAME_BYTE, CQ_NAME_BYTE);
                 if (cell == null)
                     return buffer;
-
-                String s = new String(cell.getValueArray(), cell.getValueOffset(),
-                        cell.getValueLength());
+                String s = new String(cell.getValue());
 
                 // build map. movieid -> rating ; map avg size == 50
                 StringTokenizer st = new StringTokenizer(s, "()\t");
@@ -237,11 +259,15 @@ public class InsertJob {
         }
 
         static class MultiplyReducer extends Reducer<IntWritable, Text, IntWritable, Text> {
+            String msg = "MultiplyReducer reduce";
+
             @Override
             protected void reduce(IntWritable arg0, Iterable<Text> arg1,
                     Reducer<IntWritable, Text, IntWritable, Text>.Context arg2)
                             throws IOException, InterruptedException {
+                System.out.println(this + "\t" + arg0 + msg + "+");
                 super.reduce(arg0, arg1, arg2);
+                System.out.println(this + "\t" + arg0 + msg + "-");
             }
         }
     }
@@ -250,8 +276,9 @@ public class InsertJob {
         /*
          * read similarity input and write to HBase.
          */
+        System.out.println("insertSimilarity +");
         Configuration conf = new Configuration();
-        Job job = new Job(conf);
+        Job job = new Job(conf, "insertSimilarity");
         job.setJarByClass(SimilarityInsert.class);
         job.setMapperClass(SimilarityInsert.SimilarityInsertMapper.class);
         job.setReducerClass(SimilarityInsert.SimilarityInsertReducer.class);
@@ -264,13 +291,16 @@ public class InsertJob {
 
         // create if table not exist
         createTable(HTABLE_SIMILARITY, CF_NAME);
-        job.waitForCompletion(true);
+        if (!job.waitForCompletion(true))
+            throw new RuntimeException("job failed!");
+        System.out.println("insertSimilarity -");
         // readTest(HTABLE_SIMILARITY);
     }
 
     public static void transformRating(String input, String output) throws Exception {
+        System.out.println("transformRating +");
         Configuration conf = new Configuration();
-        Job job = new Job(conf);
+        Job job = new Job(conf, "transformRating");
         job.setJarByClass(RatingInsert.class);
         job.setMapperClass(RatingInsert.RatingInsertMapper.class);
         job.setReducerClass(RatingInsert.RatingInsertReducer.class);
@@ -283,24 +313,35 @@ public class InsertJob {
 
         // create if table not exist
         createTable(HTABLE_RATING, CF_NAME);
-        job.waitForCompletion(true);
-        readTest(HTABLE_RATING);
+        if (!job.waitForCompletion(true))
+            throw new RuntimeException("job failed!");
+        // readTest(HTABLE_RATING);
+        System.out.println("transformRating -");
     }
 
     // try to dump content in htable, print out in string.
     static void readTest(String table) throws IOException {
-        System.err.println("readTest");
+        System.out.println("readTest");
+        Configuration hbaseCon = HBaseConfiguration.create();
+
+        try {
+            HBaseAdmin.checkHBaseAvailable(hbaseCon);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new IOException("still the same error", e);
+        }
+
         HTable hTable = new HTable(hbaseCon, table);
 
         Scan scan = new Scan();
         ResultScanner sc = hTable.getScanner(scan);
-        sc.forEach((row) -> {
-            Cell cell = row.getColumnLatestCell(CF_NAME_BYTE, CQ_NAME_BYTE);
 
-            String s = new String(cell.getValueArray(), cell.getValueOffset(),
-                    cell.getValueLength());
-            System.err.println(s);
-        });
+        for (Result row : sc) {
+            // TODO use old fashioned api
+            KeyValue cell = row.getColumnLatest(CF_NAME_BYTE, CQ_NAME_BYTE);
+            String s = new String(cell.getValue());
+            System.out.println(s);
+        }
 
         hTable.close();
 
@@ -309,6 +350,14 @@ public class InsertJob {
     private static void createTable(String table, String cFamily)
             throws MasterNotRunningException, ZooKeeperConnectionException, IOException {
         // Instantiating configuration class
+
+        Configuration hbaseCon = HBaseConfiguration.create();
+        try {
+            HBaseAdmin.checkHBaseAvailable(hbaseCon);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new IOException("still the same error", e);
+        }
 
         // Instantiating HbaseAdmin class
         HBaseAdmin admin = new HBaseAdmin(hbaseCon);
@@ -320,7 +369,12 @@ public class InsertJob {
         }
 
         // Instantiating table descriptor class
-        HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(table));
+        // below line not supported in AWS
+        /*
+         * HTableDescriptor tableDescriptor = new
+         * HTableDescriptor(TableName.valueOf(table));
+         */
+        HTableDescriptor tableDescriptor = new HTableDescriptor(table);
 
         // Adding column families to table descriptor
         tableDescriptor.addFamily(new HColumnDescriptor(cFamily));
@@ -328,7 +382,7 @@ public class InsertJob {
         // Execute the table through admin
         admin.createTable(tableDescriptor);
         admin.close();
-        System.out.println(" Table created ");
+        System.out.println(" Table created :" + table);
 
     }
 
@@ -343,7 +397,7 @@ public class InsertJob {
                             throws IOException, InterruptedException {
                 /* parse */
                 String[] ss = value.toString().split("\\s+");
-                // System.err.println(ss);
+                // System.out.println(ss);
 
                 int row = Integer.parseInt(ss[0]);
                 String col = ss[1];
@@ -363,29 +417,25 @@ public class InsertJob {
 
         static class SimilarityInsertReducer extends Reducer<IntWritable, Text, IntWritable, Text> {
 
-            HTable hTable;
             List<Put> batchPut = new ArrayList<>();
-
-            @Override
-            protected void setup(Reducer<IntWritable, Text, IntWritable, Text>.Context context)
-                    throws IOException, InterruptedException {
-                hTable = new HTable(hbaseCon, HTABLE_SIMILARITY);
-            }
+            String msg = "SimilarityInsertReducer reduce";
 
             @Override
             protected void reduce(IntWritable key, Iterable<Text> vals,
                     Reducer<IntWritable, Text, IntWritable, Text>.Context context)
                             throws IOException, InterruptedException {
+                System.out.println(this + "\t" + key + msg + "+");
+
                 StringBuilder strRow = new StringBuilder();
 
                 /* parse value for integer and make string for file write */
-                vals.forEach((text) -> {
+                for (Text text : vals) {
                     String val = text.toString();
                     /* (col value) */
                     strRow.append('\t').append('(').append(val).append(')');
                     String[] ss = val.split("\\s+");
-                    // System.err.println(Arrays.asList(ss));
-                });
+                    // System.out.println(Arrays.asList(ss));
+                }
 
                 /* write to file ; write to hbase */
                 final String rowValue = strRow.toString();
@@ -395,17 +445,29 @@ public class InsertJob {
                 Put put = new Put(rowkey).add(CF_NAME_BYTE, CQ_NAME_BYTE, rowValue.getBytes());
 
                 batchPut.add(put);
+                System.out.println(this + "\t" + key + msg + "-");
             }
 
             @Override
             protected void cleanup(Reducer<IntWritable, Text, IntWritable, Text>.Context context)
                     throws IOException, InterruptedException {
-                Timer t = new Timer().start();
+                System.out.println(this + "\t" + "cleanup" + msg + "+");
 
-                hTable.batch(batchPut);
-                System.err.println("time spent on insert " + t.end());
+                Timer t = new Timer().start();
+                Configuration hbaseCon = HBaseConfiguration.create();
+                try {
+                    HBaseAdmin.checkHBaseAvailable(hbaseCon);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    throw new IOException("still the same error", e);
+                }
+
+                HTable hTable = new HTable(hbaseCon, HTABLE_SIMILARITY);
+                hTable.put(batchPut);
+                System.out.println("time spent on insert " + t.end());
 
                 hTable.close();
+                System.out.println(this + "\t" + "cleanup" + msg + "-");
             }
         }
 
@@ -449,10 +511,29 @@ public class InsertJob {
          * just simply extend; only difference is setup.
          */
         static class RatingInsertReducer extends SimilarityInsertReducer {
+            String msg = "RatingInsertReducer reduce";
+
             @Override
-            protected void setup(Reducer<IntWritable, Text, IntWritable, Text>.Context context)
+            protected void cleanup(Reducer<IntWritable, Text, IntWritable, Text>.Context context)
                     throws IOException, InterruptedException {
-                hTable = new HTable(hbaseCon, HTABLE_RATING);
+                System.out.println(this + "\t" + "cleanup" + msg + "+");
+
+                Timer t = new Timer().start();
+                Configuration hbaseCon = HBaseConfiguration.create();
+                try {
+                    HBaseAdmin.checkHBaseAvailable(hbaseCon);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    throw new IOException("still the same error", e);
+                }
+
+                HTable hTable = new HTable(hbaseCon, HTABLE_RATING);
+                hTable.put(batchPut);
+                System.out.println("time spent on insert " + t.end());
+
+                hTable.close();
+                System.out.println(this + "\t" + "cleanup" + msg + "-");
+
             }
         }
 
