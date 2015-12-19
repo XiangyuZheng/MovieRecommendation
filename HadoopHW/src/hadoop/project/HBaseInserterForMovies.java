@@ -19,7 +19,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-import au.com.bytecode.opencsv.CSVReader;
+import com.opencsv.CSVReader;
 
 public class HBaseInserterForMovies {
     private static final String HTABLE_MOVIE = "Movie";
@@ -34,11 +34,11 @@ public class HBaseInserterForMovies {
         // job.setReducerClass(MovieSimilarityReducer.class);
         job.setOutputKeyClass(Text.class);
         job.setOutputValueClass(Text.class);
-         FileInputFormat.addInputPath(job, new Path(args[0]));
-         FileOutputFormat.setOutputPath(job, new Path(args[1]));
-//        FileInputFormat.addInputPath(job, new Path(
-//                "/Users/Sam/Downloads/ml-latest-small/movies.csv"));
-//        FileOutputFormat.setOutputPath(job, new Path("outputInserter"));
+        FileInputFormat.addInputPath(job, new Path(args[0]));
+        FileOutputFormat.setOutputPath(job, new Path(args[1]));
+        // FileInputFormat.addInputPath(job, new Path(
+        // "/Users/Sam/Downloads/ml-latest-small/movies.csv"));
+        // FileOutputFormat.setOutputPath(job, new Path("outputInserter"));
         // Create tables if not exist.
         Configuration con = HBaseConfiguration.create();
         HBaseAdmin admin = new HBaseAdmin(con);
@@ -61,8 +61,8 @@ public class HBaseInserterForMovies {
         private HTable movieTable;
 
         @Override
-        protected void setup(Mapper<Object, Text, Text, Text>.Context context) throws IOException,
-                InterruptedException {
+        protected void setup(Mapper<Object, Text, Text, Text>.Context context)
+                throws IOException, InterruptedException {
             super.setup(context);
             config = HBaseConfiguration.create();
             movieTable = new HTable(config, HTABLE_MOVIE);

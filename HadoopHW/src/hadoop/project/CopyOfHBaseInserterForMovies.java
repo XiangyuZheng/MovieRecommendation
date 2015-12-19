@@ -3,10 +3,6 @@ package hadoop.project;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -15,17 +11,15 @@ import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
-import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.hadoop.mapreduce.Reducer.Context;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-import au.com.bytecode.opencsv.CSVReader;
+import com.opencsv.CSVReader;
 
 public class CopyOfHBaseInserterForMovies {
     private static final String HTABLE_MOVIE = "Movie";
@@ -42,8 +36,8 @@ public class CopyOfHBaseInserterForMovies {
         job.setOutputValueClass(Text.class);
         // FileInputFormat.addInputPath(job, new Path(args[0]));
         // FileOutputFormat.setOutputPath(job, new Path(args[1]));
-        FileInputFormat.addInputPath(job, new Path(
-                "/Users/Sam/Downloads/ml-latest-small\\ 2/movies-small.csv"));
+        FileInputFormat.addInputPath(job,
+                new Path("/Users/Sam/Downloads/ml-latest-small\\ 2/movies-small.csv"));
         FileOutputFormat.setOutputPath(job, new Path("outputCal"));
         // Create tables if not exist.
         Configuration con = HBaseConfiguration.create();
@@ -69,8 +63,8 @@ public class CopyOfHBaseInserterForMovies {
         private Text outputVal = new Text();
 
         @Override
-        protected void setup(Mapper<Object, Text, Text, Text>.Context context) throws IOException,
-                InterruptedException {
+        protected void setup(Mapper<Object, Text, Text, Text>.Context context)
+                throws IOException, InterruptedException {
             super.setup(context);
         }
 
@@ -96,8 +90,7 @@ public class CopyOfHBaseInserterForMovies {
         }
     }
 
-    public static class MyReducer extends
-            Reducer<Text, Text, Text, Text> {
+    public static class MyReducer extends Reducer<Text, Text, Text, Text> {
 
         private Text mKey = new Text();
         private Text result = new Text();

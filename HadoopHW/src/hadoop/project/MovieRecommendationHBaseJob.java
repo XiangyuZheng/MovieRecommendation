@@ -3,8 +3,6 @@ package hadoop.project;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -40,9 +38,9 @@ public class MovieRecommendationHBaseJob {
         job.setOutputValueClass(Text.class);
         FileInputFormat.addInputPath(job, new Path(args[0]));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
-        // FileInputFormat.addInputPath(job, new Path(
-        // "/Users/Sam/Downloads/ml-latest-small/movies.csv"));
-        // FileOutputFormat.setOutputPath(job, new Path("output"));
+//         FileInputFormat.addInputPath(job, new Path(
+//         "/Users/Sam/Downloads/ml-latest-small/movies.csv"));
+//         FileOutputFormat.setOutputPath(job, new Path("output"));
         System.exit(job.waitForCompletion(true) ? 0 : 1);
     }
 
@@ -54,14 +52,15 @@ public class MovieRecommendationHBaseJob {
         private Text outputKey = new Text();
         private Text outputVal = new Text();
         private String movieID1 = null;
+        private String movieID2 = null;
         private String movieName1 = null;
+        private String movieName2 = null;
         private String userID = null;
         private Configuration config;
         private HTable movieTable;
         private HTable ratingTable;
         private Scan movieScanner;
         private Scan ratingScanner;
-        private List<String> movieIdList;
 
         @Override
         protected void setup(Mapper<Object, Text, Text, Text>.Context context) throws IOException,
@@ -70,14 +69,6 @@ public class MovieRecommendationHBaseJob {
             config = HBaseConfiguration.create();
             movieTable = new HTable(config, HTABLE_MOVIE);
             ratingTable = new HTable(config, HTABLE_RATING);
-            movieScanner = new Scan();
-            movieIdList = new ArrayList<String>();
-            ResultScanner movieResult = movieTable.getScanner(movieScanner);
-            String mid = null;
-            for (Result mr = movieResult.next(); mr != null; mr = movieResult.next()) {
-                mid = Bytes.toString(mr.getRow());
-                movieIdList.add(mid);
-            }
         }
 
         public void map(Object key, Text value, Context context)
@@ -85,6 +76,7 @@ public class MovieRecommendationHBaseJob {
 
             CSVReader reader = new CSVReader(new StringReader(value.toString()));
             String[] nextLine;
+            movieScanner = new Scan();
             ratingScanner = new Scan();
             while ((nextLine = reader.readNext()) != null) {
                 if (nextLine.length < 2) {
@@ -99,41 +91,39 @@ public class MovieRecommendationHBaseJob {
                 System.out.println(movieID1 + " " + movieName1);
                 PrefixFilter prefixFilter = new PrefixFilter(Bytes.toBytes(movieID1 + "-"));
                 ratingScanner.setFilter(prefixFilter);
-
-                for (String movieID2 : movieIdList) {
-                    if (movieID2.equals("movieId")
-                            || Integer.parseInt(movieID2) <= Integer.parseInt(movieID1)) {
-                        continue;
-                    }
-                    ResultScanner ratingResult = ratingTable.getScanner(ratingScanner);
-                    List<Get> getList = new ArrayList<Get>();
-                    List<String> ratingsForMovieID1 = new ArrayList<String>();
-                    try {
-                        for (Result rr = ratingResult.next(); rr != null; rr = ratingResult
-                                .next()) {
-                            userID = Bytes.toString(rr.getRow()).split("-")[1];
-                            Get g = new Get(Bytes.toBytes(movieID2 + "-" + userID));
-                            getList.add(g);
-                            ratingsForMovieID1.add(Bytes.toString(rr.getValue(
-                                    Bytes.toBytes(HTABLE_FAMILY), Bytes
-                                            .toBytes("Rating"))));
-                            // Result r = ratingTable.get(g);
+                ResultScanner movieResult = movieTable.getScanner(movieScanner);
+                try {
+                    for (Result mr = movieResult.next(); mr != null; mr = movieResult.next()) {
+                        movieID2 = Bytes.toString(mr.getRow());
+                        if (movieID2.equals("movieId")
+                                || Integer.parseInt(movieID2) <= Integer.parseInt(movieID1)) {
+                            continue;
                         }
-                    } finally {
-                        ratingResult.close();
-                    }
-                    Result[] ratingResults = ratingTable.get(getList);
-                    for (int index = 0; index < ratingResults.length; index++) {
-                        String rating2 = Bytes.toString(ratingResults[index].getValue(
-                                Bytes.toBytes(HTABLE_FAMILY), Bytes
-                                        .toBytes("Rating")));
-                        if (rating2 != null) {
-                            String rating1 = ratingsForMovieID1.get(index);
-                            outputKey.set(movieID1 + "-" + movieID2);
-                            outputVal.set(rating1 + "," + rating2);
-                            context.write(outputKey, outputVal);
+                        ResultScanner ratingResult = ratingTable.getScanner(ratingScanner);
+                        try {
+                            for (Result rr = ratingResult.next(); rr != null; rr = ratingResult
+                                    .next()) {
+                                userID = Bytes.toString(rr.getRow()).split("-")[1];
+                                Get g = new Get(Bytes.toBytes(movieID2 + "-" + userID));
+                                Result r = ratingTable.get(g);
+                                String rating2 = Bytes.toString(r.getValue(
+                                        Bytes.toBytes(HTABLE_FAMILY), Bytes
+                                                .toBytes("Rating")));
+                                if (rating2 != null) {
+                                    String rating1 = Bytes.toString(rr.getValue(
+                                            Bytes.toBytes(HTABLE_FAMILY), Bytes
+                                                    .toBytes("Rating")));
+                                    outputKey.set(movieID1 + "-" + movieID2);
+                                    outputVal.set(rating1 + "," + rating2);
+                                    context.write(outputKey, outputVal);
+                                }
+                            }
+                        } finally {
+                            ratingResult.close();
                         }
                     }
+                } finally {
+                    movieResult.close();
                 }
             }
         }

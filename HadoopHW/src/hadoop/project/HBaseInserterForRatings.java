@@ -19,7 +19,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-import au.com.bytecode.opencsv.CSVReader;
+import com.opencsv.CSVReader;
 
 public class HBaseInserterForRatings {
     private static final String HTABLE_RATING = "Rating";
@@ -34,11 +34,12 @@ public class HBaseInserterForRatings {
         // job.setReducerClass(MovieSimilarityReducer.class);
         job.setOutputKeyClass(Text.class);
         job.setOutputValueClass(Text.class);
-         FileInputFormat.addInputPath(job, new Path(args[0]));
-         FileOutputFormat.setOutputPath(job, new Path(args[1]));
-//        FileInputFormat.addInputPath(job, new Path(
-//                "/Users/Sam/Downloads/ml-latest-small/ratings.csv"));
-//        FileOutputFormat.setOutputPath(job, new Path("outputInserterRating"));
+        FileInputFormat.addInputPath(job, new Path(args[0]));
+        FileOutputFormat.setOutputPath(job, new Path(args[1]));
+        // FileInputFormat.addInputPath(job, new Path(
+        // "/Users/Sam/Downloads/ml-latest-small/ratings.csv"));
+        // FileOutputFormat.setOutputPath(job, new
+        // Path("outputInserterRating"));
         // Create tables if not exist.
         Configuration con = HBaseConfiguration.create();
         HBaseAdmin admin = new HBaseAdmin(con);
@@ -62,8 +63,8 @@ public class HBaseInserterForRatings {
         private HTable ratingTable;
 
         @Override
-        protected void setup(Mapper<Object, Text, Text, Text>.Context context) throws IOException,
-                InterruptedException {
+        protected void setup(Mapper<Object, Text, Text, Text>.Context context)
+                throws IOException, InterruptedException {
             super.setup(context);
             config = HBaseConfiguration.create();
             ratingTable = new HTable(config, HTABLE_RATING);
@@ -80,8 +81,7 @@ public class HBaseInserterForRatings {
                 rating = nextLine[2];
                 // inserts into HBase
                 Put p = new Put(Bytes.toBytes(movieID + "-" + userID));
-                p.add(Bytes.toBytes(HTABLE_FAMILY), Bytes.toBytes("Rating"),
-                        Bytes.toBytes(rating));
+                p.add(Bytes.toBytes(HTABLE_FAMILY), Bytes.toBytes("Rating"), Bytes.toBytes(rating));
                 ratingTable.put(p);
             }
         }
